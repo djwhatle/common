@@ -137,6 +137,9 @@ func (jc *JobController) ReconcileJobs(
 		return err
 	}
 
+	// Check whether
+	gangSchedulingEnabledForJob := commonutil.IsGangSchedulerSet(replicas, commonutil.DefaultGangSchedulerName)
+
 	oldStatus := jobStatus.DeepCopy()
 	if commonutil.IsSucceeded(jobStatus) || commonutil.IsFailed(jobStatus) {
 		// If the Job is succeed or failed, delete all pods and services.
@@ -148,7 +151,7 @@ func (jc *JobController) ReconcileJobs(
 			return err
 		}
 
-		if jc.Config.EnableGangScheduling {
+		if jc.Config.EnableGangScheduling && gangSchedulingEnabledForJob {
 			jc.Recorder.Event(runtimeObject, v1.EventTypeNormal, "JobTerminated", "Job has been terminated. Deleting PodGroup")
 			if err := jc.DeletePodGroup(metaObject); err != nil {
 				jc.Recorder.Eventf(runtimeObject, v1.EventTypeWarning, "FailedDeletePodGroup", "Error deleting: %v", err)
@@ -234,7 +237,7 @@ func (jc *JobController) ReconcileJobs(
 			return err
 		}
 
-		if jc.Config.EnableGangScheduling {
+		if jc.Config.EnableGangScheduling && gangSchedulingEnabledForJob {
 			jc.Recorder.Event(runtimeObject, v1.EventTypeNormal, "JobTerminated", "Job has been terminated. Deleting PodGroup")
 			if err := jc.DeletePodGroup(metaObject); err != nil {
 				jc.Recorder.Eventf(runtimeObject, v1.EventTypeWarning, "FailedDeletePodGroup", "Error deleting: %v", err)
@@ -254,7 +257,7 @@ func (jc *JobController) ReconcileJobs(
 		return jc.Controller.UpdateJobStatusInApiServer(job, &jobStatus)
 	} else {
 		// General cases which need to reconcile
-		if jc.Config.EnableGangScheduling {
+		if jc.Config.EnableGangScheduling && gangSchedulingEnabledForJob {
 			minMember := totalReplicas
 			queue := ""
 			priorityClass := ""
@@ -325,7 +328,7 @@ func (jc *JobController) ReconcileJobs(
 }
 
 // ResetExpectations reset the expectation for creates and deletes of pod/service to zero.
-func (jc *JobController) ResetExpectations(jobKey string, replicas map[apiv1.ReplicaType]*apiv1.ReplicaSpec)  {
+func (jc *JobController) ResetExpectations(jobKey string, replicas map[apiv1.ReplicaType]*apiv1.ReplicaSpec) {
 	for rtype := range replicas {
 		rt := strings.ToLower(string(rtype))
 		expectationPodsKey := expectation.GenExpectationPodsKey(jobKey, rt)
