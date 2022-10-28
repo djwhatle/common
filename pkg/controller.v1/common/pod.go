@@ -423,10 +423,12 @@ func (jc *JobController) createNewPod(job interface{}, rt string, index int, spe
 	}
 	core.SetRestartPolicy(podTemplate, spec)
 
+	gangSchedulingEnabledForJob := commonutil.IsGangSchedulerSet(replicas, commonutil.DefaultGangSchedulerName)
+
 	// if gang-scheduling is enabled:
 	// 1. if user has specified other scheduler, we report a warning without overriding any fields.
 	// 2. if no SchedulerName is set for pods, then we set the SchedulerName to "volcano".
-	if jc.Config.EnableGangScheduling {
+	if jc.Config.EnableGangScheduling && gangSchedulingEnabledForJob {
 		if isNonGangSchedulerSet(replicas) {
 			errMsg := "Another scheduler is specified when gang-scheduling is enabled and it will not be overwritten"
 			logger.Warning(errMsg)
@@ -439,9 +441,7 @@ func (jc *JobController) createNewPod(job interface{}, rt string, index int, spe
 			podTemplate.Annotations = map[string]string{}
 		}
 
-		if jc.Config.EnableGangScheduling {
-			podTemplate.Annotations[gangSchedulingPodGroupAnnotation] = metaObject.GetName()
-		}
+		podTemplate.Annotations[gangSchedulingPodGroupAnnotation] = metaObject.GetName()
 	}
 
 	// Creation is expected when there is no error returned
